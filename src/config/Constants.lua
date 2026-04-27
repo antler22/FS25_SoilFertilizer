@@ -192,6 +192,23 @@ SoilConstants.CROP_EXTRACTION = {
     sorghum    = { N=2.30, P=0.90, K=1.80 },  -- Efficient nutrient user
     peas       = { N=2.90, P=1.10, K=2.00 },  -- Legume, moderate demand
     beans      = { N=3.00, P=1.20, K=2.10 },  -- Legume, similar to peas
+
+    -- ── Forage / biomass crops ─────────────────────────────────────────────────
+    -- Forage harvesters cut entire plants and produce very high liter volumes per
+    -- hectare (40,000–80,000 L/ha vs ~8,000 L/ha for grain).  Absolute nutrient
+    -- removal per hectare is similar to or less than grain, so the per-1000L rate
+    -- must be ~10-14× lower than the grain-calibrated defaults above.
+    --
+    -- Calibration target: ~8–14 N points depleted per full-hectare forage harvest,
+    -- comparable to a grain harvest (16 N pts).
+    miscanthus     = { N=0.15, P=0.04, K=0.18 }, -- Energy grass; low nutrient demand, very high volume
+    grass          = { N=0.20, P=0.07, K=0.22 }, -- Forage grass; multiple cuts/season
+    drygrass       = { N=0.18, P=0.06, K=0.20 }, -- Mowed/dried grass (same field, processed form)
+    alfalfa        = { N=0.08, P=0.12, K=0.30 }, -- Legume: fixes own N, moderate P/K removal
+    meadow         = { N=0.18, P=0.06, K=0.20 }, -- Mixed wildflower meadow; similar to grass
+    clover         = { N=0.07, P=0.10, K=0.25 }, -- Legume cover crop; near-zero N removal
+    oilseed_radish = { N=0.25, P=0.08, K=0.20 }, -- Cover crop; harvested at low volume
+    mint           = { N=0.28, P=0.09, K=0.22 }, -- Specialty herb; moderate nutrient removal
 }
 
 -- Default extraction for unknown crops (average cereal)

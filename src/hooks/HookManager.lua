@@ -10,10 +10,19 @@
 HookManager = {}
 local HookManager_mt = Class(HookManager)
 
+-- Minimum milliseconds between successive onPlowing/onCultivation/onStripTill calls
+-- for the same field. onEndWorkAreaProcessing fires every game tick (~30/sec) while
+-- an implement is active, but soil state only needs updating once every few seconds.
+local TILLAGE_THROTTLE_MS = 2000
+
 function HookManager.new()
     local self = setmetatable({}, HookManager_mt)
     self.hooks = {}
     self.installed = false
+    -- Per-field throttle timestamps (fieldId -> g_currentMission.time of last tillage call).
+    -- Shared across all tillage hooks so plowing, cultivation, and strip-till on the
+    -- same field do not pile up within the same 2-second window.
+    self._tillageThrottle = {}
     return self
 end
 
@@ -1316,6 +1325,14 @@ function HookManager:installPlowingHook()
                 SoilLogger.info("[PlowHook] pos=(%.1f,%.1f) farmlandId=%s isPlow=%s",
                     x, z, tostring(farmlandId), tostring(isPlowSpec))
                 if farmlandId and farmlandId > 0 then
+                    -- Throttle: onEndWorkAreaProcessing fires ~30/sec while the implement
+                    -- is active. Soil state only needs updating once every few seconds.
+                    local now = g_currentMission and g_currentMission.time or 0
+                    if (now - (hookMgrRef._tillageThrottle[farmlandId] or 0)) < TILLAGE_THROTTLE_MS then
+                        return
+                    end
+                    hookMgrRef._tillageThrottle[farmlandId] = now
+
                     local isPlowingTool = isPlowSpec
                     -- Some cultivators work deep enough to act as plows
                     if not isPlowingTool and spec.workingDepth and
@@ -1399,6 +1416,13 @@ function HookManager:installDedicatedPlowHook()
                 SoilLogger.debug("[DedicatedPlowHook] pos=(%.1f,%.1f) farmlandId=%s",
                     x, z, tostring(farmlandId))
                 if farmlandId and farmlandId > 0 then
+                    -- Throttle: prevent 30/sec soil calls on the same field
+                    local now = g_currentMission and g_currentMission.time or 0
+                    if (now - (hookMgrRef._tillageThrottle[farmlandId] or 0)) < TILLAGE_THROTTLE_MS then
+                        return
+                    end
+                    hookMgrRef._tillageThrottle[farmlandId] = now
+
                     g_SoilFertilityManager.soilSystem:onPlowing(farmlandId)
 
                     if g_SoilFertilityManager.settings.compactionEnabled then
@@ -1466,6 +1490,13 @@ function HookManager:installWeederHook()
                 local farmlandId = hookMgrRef:getFieldIdAtWorldPosition(x, z)
                 SoilLogger.debug("[WeederHook] pos=(%.1f,%.1f) farmlandId=%s", x, z, tostring(farmlandId))
                 if farmlandId and farmlandId > 0 then
+                    -- Throttle: prevent 30/sec soil calls on the same field
+                    local now = g_currentMission and g_currentMission.time or 0
+                    if (now - (hookMgrRef._tillageThrottle[farmlandId] or 0)) < TILLAGE_THROTTLE_MS then
+                        return
+                    end
+                    hookMgrRef._tillageThrottle[farmlandId] = now
+
                     g_SoilFertilityManager.soilSystem:onCultivation(farmlandId)
                     SoilLogger.debug("[WeederHook] Field %d: mechanical weed removal applied", farmlandId)
                 end
@@ -1525,6 +1556,11 @@ function HookManager:installRidgeTillerHook()
                 -- PHASE 5: use shared MapDataGrid-backed cache (self = HookManager upvalue)
                 local fieldId = self:getFieldIdAtWorldPosition(centerX, centerZ)
                 if not fieldId or fieldId <= 0 then return end
+
+                -- Throttle: processRidgeTillerArea fires every game tick (~30/sec)
+                local now = g_currentMission and g_currentMission.time or 0
+                if (now - (self._tillageThrottle[fieldId] or 0)) < TILLAGE_THROTTLE_MS then return end
+                self._tillageThrottle[fieldId] = now
 
                 SoilLogger.debug("[RidgeTillerHook] Field %d at (%.1f, %.1f)", fieldId, centerX, centerZ)
                 g_SoilFertilityManager.soilSystem:onStripTill(fieldId)
