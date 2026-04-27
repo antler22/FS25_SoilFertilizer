@@ -831,9 +831,16 @@ function SoilFertilitySystem:scanFields()
             local actualFieldId = field.farmland and field.farmland.id
 
             if actualFieldId and actualFieldId > 0 then
-                -- FS25: field.fieldArea is the cultivated area in hectares.
-                -- Fallback to farmland area if fieldArea is missing (though it shouldn't be).
-                local area = field.fieldArea or (field.farmland and field.farmland.area) or 1.0
+                -- FS25 Field object: area is stored in field.areaHa (set from polygon geometry).
+                -- getAreaHa() is the official accessor; field.areaHa is the backing field.
+                -- Fallback chain: method → property → farmland.areaInHa → 1.0 ha default.
+                -- NOTE: field.fieldArea and farmland.area do NOT exist on FS25 objects —
+                -- both return nil, causing every field to default to 1 ha and making
+                -- coverage/totalFieldCells wildly wrong (especially visible on 16x maps).
+                local area = (field.getAreaHa and field:getAreaHa())
+                          or field.areaHa
+                          or (field.farmland and field.farmland.areaInHa)
+                          or 1.0
                 
                 SoilLogger.debug("Found field %d (%.2f ha)", actualFieldId, area)
 
