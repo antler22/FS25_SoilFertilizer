@@ -127,9 +127,13 @@ function HookManager:installAll(soilSystem)
 
     SoilLogger.info("Installing event hooks...")
 
-    -- Harvest hook (FruitUtil)
+    -- Harvest hook: direct-cut combines and forage harvesters (Cutter spec)
     local harvestOk = self:installHarvestHook()
     if harvestOk then successCount = successCount + 1 else failCount = failCount + 1 end
+
+    -- Mower/swather hook: mowed/windrowed crops (grass, alfalfa, mowed triticale, etc.)
+    local mowerOk = self:installMowerHook()
+    if mowerOk then successCount = successCount + 1 else failCount = failCount + 1 end
 
     -- Fertilizer application hook (covers ALL sprayers + spreaders via Sprayer specialization)
     local sprayerAreaOk = self:installSprayerAreaHook()
@@ -920,6 +924,80 @@ function HookManager:installHarvestHook()
     )
     self:register(Cutter, "onEndWorkAreaProcessing", original, "Cutter.onEndWorkAreaProcessing")
     SoilLogger.info("[OK] Harvest hook installed (Cutter.onEndWorkAreaProcessing)")
+    return true
+end
+
+-- =========================================================
+-- HOOK 1b: Mower / Swather (mowed / windrowed crops)
+-- =========================================================
+-- Hooks Mower.onEndWorkAreaProcessing to capture nutrient depletion for crops
+-- that are CUT (not directly threshed): grass, alfalfa, clover, mowed triticale, etc.
+--
+-- Why here and not Cutter?
+--   • The Mower spec processes WorkAreaType.MOWER areas using FSDensityMapUtil.updateMowerArea.
+--   • Cutter.processCutterArea only reads the STANDING-CROP density map — it returns 0 area
+--     for windrow pickup passes, so Cutter.onEndWorkAreaProcessing never fires for them.
+--   • Mower.onEndWorkAreaProcessing fires for both disc mowers, drum mowers, and swathers
+--     (any implement registered with the Mower specialization).
+--
+-- Parameters used:
+--   spec_mower.workAreaParameters.lastStatsArea     — density-map pixels cut this tick
+--   spec_mower.workAreaParameters.lastInputFruitType — FS25 fruit type index (grass, alfalfa…)
+--
+-- Yield penalty: NOT applied here. We cannot reduce windrow density after it is deposited.
+-- The forage-harvester pickup penalty path (Cutter hook) covers direct-cut silage.
+---@return boolean success True if hook installed successfully
+function HookManager:installMowerHook()
+    if not Mower or type(Mower.onEndWorkAreaProcessing) ~= "function" then
+        SoilLogger.warning("Could not install mower hook - Mower.onEndWorkAreaProcessing not available")
+        return false
+    end
+
+    local hookMgrRef = self
+    local original = Mower.onEndWorkAreaProcessing
+    Mower.onEndWorkAreaProcessing = Utils.appendedFunction(
+        original,
+        function(mowerSelf, dt, hasProcessed)
+            if not mowerSelf.isServer then return end
+            if not g_SoilFertilityManager or
+               not g_SoilFertilityManager.soilSystem or
+               not g_SoilFertilityManager.settings.enabled or
+               not g_SoilFertilityManager.settings.nutrientCycles then
+                return
+            end
+
+            local spec = mowerSelf.spec_mower
+            if not spec or not spec.workAreaParameters then return end
+
+            -- lastStatsArea: density-map pixels cut this tick (same unit as Cutter's lastArea)
+            local area = spec.workAreaParameters.lastStatsArea or 0
+            if area <= 0 then return end
+
+            local fruitType = spec.workAreaParameters.lastInputFruitType
+            if not fruitType or fruitType <= 0 then return end
+
+            local success, errorMsg = pcall(function()
+                local x, _, z = getWorldTranslation(mowerSelf.rootNode)
+                if not x then return end
+
+                local fieldId = hookMgrRef:getFieldIdAtWorldPosition(x, z)
+                if not fieldId or fieldId <= 0 then return end
+
+                SoilLogger.debug("[MowerHook] Field %d, Crop %d, area=%.1f px", fieldId, fruitType, area)
+
+                -- Pass harvestedLiters=0: updateFieldNutrients takes the area-based path
+                -- when area > 0, regardless of liters.  The fallback (liters/8000) only
+                -- activates when area == 0 AND liters > 0, so it stays silent here.
+                g_SoilFertilityManager.soilSystem:onHarvest(fieldId, fruitType, 0, 0, area)
+            end)
+
+            if not success then
+                SoilLogger.error("Mower hook failed: %s", tostring(errorMsg))
+            end
+        end
+    )
+    self:register(Mower, "onEndWorkAreaProcessing", original, "Mower.onEndWorkAreaProcessing")
+    SoilLogger.info("[OK] Mower hook installed (Mower.onEndWorkAreaProcessing)")
     return true
 end
 

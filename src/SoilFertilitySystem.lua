@@ -1351,25 +1351,30 @@ end
 -- Update field nutrients after harvest
 ---@param fieldId number The field being harvested
 ---@param fruitTypeIndex number FS25 fruit type index
----@param harvestedLiters number Amount harvested in liters
----@param strawRatio number 0.0-1.0 fraction of straw chopped back into the field (adds organic matter)
----@param area number Area harvested in m² (unused; reserved for future area-normalised depletion)
---- Returns the yield multiplier (0.65–1.0) for a field based on its current N/P/K levels.
+---@param harvestedLiters number Amount harvested in liters (0 for mower/windrow passes)
+---@param strawRatio number 0.0-1.0 fraction of straw chopped back into field (adds OM)
+---@param area number Area in density-map pixels (converted to ha via MathUtil.areaToHa)
+--- Returns the yield multiplier (0.30–1.0) for a field based on its current N/P/K levels.
 --- Called from the harvest hook to deduct penalty liters from the combine's fill unit
 --- BEFORE those liters are credited to the player, creating a real-time yield feedback loop.
+--- Untracked fields fall back to FIELD_DEFAULTS (Fair range) so a freshly-started map
+--- still reflects the actual starting soil quality rather than silently giving full yield.
 ---@param fieldId number
----@return number multiplier  1.0 = no penalty; 0.65 = maximum 35% penalty at zero nutrients
+---@return number multiplier  1.0 = no penalty; 0.30 = maximum 70% penalty at zero nutrients
 function SoilFertilitySystem:getYieldMultiplier(fieldId)
     if not self.settings.enabled or not self.settings.yieldPenalty then return 1.0 end
     if not SoilConstants.YIELD_PENALTY then return 1.0 end
 
-    local field = self.fieldData[fieldId]
-    if not field then return 1.0 end
+    -- Use tracked data when available; fall back to FIELD_DEFAULTS for untracked fields.
+    -- Returning hard 1.0 for untracked fields would silently grant full yield regardless
+    -- of actual starting soil quality, which is agronomically wrong.
+    local fd       = self.fieldData[fieldId]
+    local defaults = SoilConstants.FIELD_DEFAULTS
+    local yp       = SoilConstants.YIELD_PENALTY
 
-    local yp = SoilConstants.YIELD_PENALTY
-    local n = field.nitrogen   or SoilConstants.FIELD_DEFAULTS.nitrogen
-    local p = field.phosphorus or SoilConstants.FIELD_DEFAULTS.phosphorus
-    local k = field.potassium  or SoilConstants.FIELD_DEFAULTS.potassium
+    local n = (fd and fd.nitrogen)   or defaults.nitrogen
+    local p = (fd and fd.phosphorus) or defaults.phosphorus
+    local k = (fd and fd.potassium)  or defaults.potassium
 
     -- Each nutrient scores 0.0 (depleted) → 1.0 (at or above optimal threshold)
     local nQ = math.max(0, math.min(1, n / yp.N_OPTIMAL))

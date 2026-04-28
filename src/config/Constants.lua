@@ -227,7 +227,11 @@ SoilConstants.CROP_EXTRACTION_DEFAULT = { N=15.0, P=6.0, K=13.0 }
 -- When soil nutrients are below optimal, a yield penalty is applied to the
 -- combine/forage harvester's fill level in real-time via addFillUnitFillLevel.
 -- The penalty is proportional to how far below optimal each nutrient is,
--- weighted by agronomic importance.  Maximum 35% yield reduction at zero nutrients.
+-- weighted by agronomic importance.
+--
+-- Agronomic basis: severely depleted soil (N/P/K near zero) can reduce yields
+-- by 70% or more in real-world conditions.  A well-fertilized field (at or above
+-- optimal thresholds) suffers no penalty.
 SoilConstants.YIELD_PENALTY = {
     -- Threshold above which each nutrient gives full quality score (0-100 scale)
     N_OPTIMAL   = 60,   -- Adequate nitrogen: ≥60 = 100% N quality
@@ -237,9 +241,10 @@ SoilConstants.YIELD_PENALTY = {
     N_WEIGHT    = 0.60,
     P_WEIGHT    = 0.20,
     K_WEIGHT    = 0.20,
-    -- Maximum yield penalty fraction (0 = no effect, 0.35 = up to 35% reduction)
-    -- At completely depleted soil (N=P=K=0): yield × (1 - 0.35) = 65% of potential
-    MAX_PENALTY = 0.35,
+    -- Maximum yield penalty fraction (0 = no effect, 0.70 = up to 70% reduction)
+    -- At completely depleted soil (N=P=K=0): yield × (1 - 0.70) = 30% of potential
+    -- At default "Fair" starting values (N=40,P=30,K=35): ~19% penalty
+    MAX_PENALTY = 0.70,
 }
 
 -- ========================================
@@ -388,6 +393,10 @@ SoilConstants.PPM_DISPLAY = {
     N = 3.0,   -- internal 50 (fair→good boundary) = 150 ppm
     P = 0.6,   -- internal 45 (fair→good boundary) = 27 ppm
     K = 4.0,   -- internal 40 (fair→good boundary) = 160 ppm
+    -- Imperial conversion: 1 ppm (soil test) ≈ 2 lb/ac
+    -- Standard agronomic relationship: the surface 6-7" of one acre weighs ~2 million lb,
+    -- so 1 part-per-million = 2 lb per acre.  Used by all US extension soil labs.
+    PPM_TO_LB_PER_AC = 2.0,
 }
 
 -- Threshold for "needs fertilization" warning
