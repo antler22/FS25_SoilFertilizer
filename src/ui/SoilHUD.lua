@@ -694,13 +694,14 @@ function SoilHUD:drawPanel()
         setTextAlignment(RenderText.ALIGN_LEFT)
     end
 
-    -- Divider above N/P/K block; "(ppm)" unit label right-aligned on the same line
-    -- so the user sees the unit context once, not repeated on every row.
+    -- Divider above N/P/K block; unit label right-aligned on the same line.
+    -- Shows "(lb/ac)" for US users when useImperialUnits is true, else "(ppm)".
     cy = cy - pad * 0.8
     self:drawRect(px + pad, cy, pw - pad*2, 0.0005, SoilHUD.C_DIVIDER)
     setTextAlignment(RenderText.ALIGN_RIGHT)
     setTextColor(SoilHUD.C_DIM[1], SoilHUD.C_DIM[2], SoilHUD.C_DIM[3], 0.60)
-    renderText(px + pw - pad, cy + 0.001*s, 0.007 * fontMult * s, "(ppm)")
+    local unitLabel = (self.settings and self.settings.useImperialUnits ~= false) and "(lb/ac)" or "(ppm)"
+    renderText(px + pw - pad, cy + 0.001*s, 0.007 * fontMult * s, unitLabel)
     setTextAlignment(RenderText.ALIGN_LEFT)
     cy = cy - pad * 0.8
 
@@ -935,17 +936,22 @@ function SoilHUD:drawNutrientRow(label, nutrient, px, cy, pw, s, fontMult, info,
         end
     end
 
-    -- Value displayed in ppm
-    local ppmMult = SoilConstants.PPM_DISPLAY and SoilConstants.PPM_DISPLAY[label] or 1.0
-    local ppmVal  = math.floor(nutrient.value * ppmMult + 0.5)
-    local valX    = barX + barW + 0.006*s
+    -- Value displayed in ppm, or lb/ac when useImperialUnits is true.
+    -- Conversion chain: internal (0-100) → ppm via PPM_DISPLAY[label] → lb/ac via PPM_TO_LB_PER_AC.
+    -- 1 ppm ≈ 2 lb/ac (US agronomic standard: surface 6-7" of 1 acre weighs ~2M lb).
+    local ppm      = SoilConstants.PPM_DISPLAY or {}
+    local ppmMult  = ppm[label] or 1.0
+    local imperial = (self.settings and self.settings.useImperialUnits ~= false)
+    local dispMult = imperial and ppmMult * (ppm.PPM_TO_LB_PER_AC or 2.0) or ppmMult
+    local dispVal  = math.floor(nutrient.value * dispMult + 0.5)
+    local valX     = barX + barW + 0.006*s
     setTextColor(col[1], col[2], col[3], 1.0)
-    
-    local valStr = string.format("%d", ppmVal)
+
+    local valStr = string.format("%d", dispVal)
     if projectedDelta > 0 then
-        local projPpm = math.floor(projectedDelta * ppmMult + 0.5)
-        if projPpm > 0 then
-            valStr = valStr .. string.format(" (+%d)", projPpm)
+        local projDisp = math.floor(projectedDelta * dispMult + 0.5)
+        if projDisp > 0 then
+            valStr = valStr .. string.format(" (+%d)", projDisp)
         end
     end
     renderText(valX, cy + (rowH - 0.010*s) * 0.5, 0.010 * fontMult * s, valStr)

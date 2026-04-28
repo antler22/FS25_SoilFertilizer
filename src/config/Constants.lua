@@ -351,6 +351,10 @@ SoilConstants.PPM_DISPLAY = {
     N = 3.0,   -- internal 50 (fair→good boundary) = 150 ppm
     P = 0.6,   -- internal 45 (fair→good boundary) = 27 ppm
     K = 4.0,   -- internal 40 (fair→good boundary) = 160 ppm
+    -- Imperial conversion: 1 ppm (soil test) ≈ 2 lb/ac
+    -- Basis: surface 6-7" of one acre weighs ~2 million lb; 1 ppm = 2 lb/ac.
+    -- This is the standard used by US extension soil labs (UNL, Penn State, etc.)
+    PPM_TO_LB_PER_AC = 2.0,
 }
 
 -- Threshold for "needs fertilization" warning
