@@ -1354,6 +1354,35 @@ end
 ---@param harvestedLiters number Amount harvested in liters
 ---@param strawRatio number 0.0-1.0 fraction of straw chopped back into the field (adds organic matter)
 ---@param area number Area harvested in m² (unused; reserved for future area-normalised depletion)
+--- Returns the yield multiplier (0.65–1.0) for a field based on its current N/P/K levels.
+--- Called from the harvest hook to deduct penalty liters from the combine's fill unit
+--- BEFORE those liters are credited to the player, creating a real-time yield feedback loop.
+---@param fieldId number
+---@return number multiplier  1.0 = no penalty; 0.65 = maximum 35% penalty at zero nutrients
+function SoilFertilitySystem:getYieldMultiplier(fieldId)
+    if not self.settings.enabled or not self.settings.yieldPenalty then return 1.0 end
+    if not SoilConstants.YIELD_PENALTY then return 1.0 end
+
+    local field = self.fieldData[fieldId]
+    if not field then return 1.0 end
+
+    local yp = SoilConstants.YIELD_PENALTY
+    local n = field.nitrogen   or SoilConstants.FIELD_DEFAULTS.nitrogen
+    local p = field.phosphorus or SoilConstants.FIELD_DEFAULTS.phosphorus
+    local k = field.potassium  or SoilConstants.FIELD_DEFAULTS.potassium
+
+    -- Each nutrient scores 0.0 (depleted) → 1.0 (at or above optimal threshold)
+    local nQ = math.max(0, math.min(1, n / yp.N_OPTIMAL))
+    local pQ = math.max(0, math.min(1, p / yp.P_OPTIMAL))
+    local kQ = math.max(0, math.min(1, k / yp.K_OPTIMAL))
+
+    -- Weighted composite quality score
+    local soilQuality = yp.N_WEIGHT * nQ + yp.P_WEIGHT * pQ + yp.K_WEIGHT * kQ
+
+    -- Yield multiplier: 1.0 at perfect soil, (1 - MAX_PENALTY) at fully depleted
+    return 1.0 - (1.0 - soilQuality) * yp.MAX_PENALTY
+end
+
 function SoilFertilitySystem:updateFieldNutrients(fieldId, fruitTypeIndex, harvestedLiters, strawRatio, area)
     if not self.settings.enabled or not self.settings.nutrientCycles then return end
 
@@ -1373,28 +1402,39 @@ function SoilFertilitySystem:updateFieldNutrients(fieldId, fruitTypeIndex, harve
     field.lastCrop3 = field.lastCrop2
     field.lastCrop2 = field.lastCrop
 
-    -- Look up crop-specific extraction rates (how much N/P/K this crop removes from soil)
-    -- Different crops have different nutrient demands:
-    -- - Wheat/Barley: High nitrogen demand (leafy growth)
-    -- - Corn/Maize: Very high N/P demand (large biomass)
-    -- - Soybeans: Low nitrogen (fixes own N), moderate P/K
-    -- - Potatoes/Sugar beets: High potassium demand (root/tuber crops)
+    -- Look up crop-specific extraction rates (how much N/P/K this crop removes per ha)
     local name = string.lower(fruitDesc.name or "unknown")
     local rates = SoilConstants.CROP_EXTRACTION[name] or SoilConstants.CROP_EXTRACTION_DEFAULT
 
     -- NUTRIENT DEPLETION CALCULATION EXPLAINED:
     --
-    -- Step 1: Calculate depletion factor
-    -- Formula: factor = harvested liters / 1000
-    -- Why: Extraction rates in Constants.lua are calibrated per 1000L of harvested crop
-    -- Example: 80,000L wheat harvest → factor = 80
-    local factor = harvestedLiters / 1000
+    -- Step 1: Calculate depletion factor in HECTARES harvested this tick.
+    --
+    -- Rates are now PER-HECTARE (not per-1000L).  This means the calibration is
+    -- independent of how many liters/ha each crop produces — forage harvesters
+    -- cutting MISCANTHUS at 60,000 L/ha get the same per-ha treatment as a grain
+    -- combine cutting wheat at 8,000 L/ha.  No per-crop volume fudge factors needed.
+    --
+    -- Conversion: cutter's lastArea (density-map pixels) → hectares via FS25 API:
+    --   harvestedHa = MathUtil.areaToHa(lastArea, g_currentMission:getFruitPixelsToSqm())
+    -- Fallback: if area unavailable, estimate from liters at wheat density (~8,000 L/ha).
+    local harvestedHa = 0
+    if area and area > 0 and g_currentMission and g_currentMission.getFruitPixelsToSqm then
+        local pixToSqm = g_currentMission:getFruitPixelsToSqm()
+        if pixToSqm and pixToSqm > 0 then
+            harvestedHa = MathUtil.areaToHa(area, pixToSqm)
+        end
+    end
+    if harvestedHa <= 0 and harvestedLiters > 0 then
+        -- Fallback: estimate area from liters using grain-crop density
+        harvestedHa = harvestedLiters / 8000
+    end
+    local factor = harvestedHa
 
     -- Step 2: Apply difficulty multiplier
-    -- Simple (0.7x): 30% less depletion, easier for new players
-    -- Realistic (1.0x): Balanced depletion based on real agricultural rates
-    -- Hardcore (1.5x): 50% more depletion, challenging management
-    -- Example: factor 80 × 0.7 (Simple) = 56, or × 1.5 (Hardcore) = 120
+    -- Simple (0.7x): 30% less depletion for new players
+    -- Realistic (1.0x): Calibrated to real agronomic removal rates
+    -- Hardcore (1.5x): 50% more demanding
     local diffMultiplier = SoilConstants.DIFFICULTY.MULTIPLIERS[self.settings.difficulty]
     if diffMultiplier then
         factor = factor * diffMultiplier
@@ -1453,8 +1493,8 @@ function SoilFertilitySystem:updateFieldNutrients(fieldId, fruitTypeIndex, harve
     field.lastHarvest = (g_currentMission and g_currentMission.environment and g_currentMission.environment.currentDay) or 0
 
     self:log(
-        "Harvest depletion field %d (%s): -N %.1f -P %.1f -K %.1f",
-        fieldId, fruitDesc.name,
+        "Harvest depletion field %d (%s): %.4f ha → -N %.2f -P %.2f -K %.2f",
+        fieldId, fruitDesc.name, harvestedHa,
         rates.N * factor,
         rates.P * factor,
         rates.K * factor

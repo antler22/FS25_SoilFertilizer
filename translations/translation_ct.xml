@@ -12,6 +12,8 @@
     <e k="sf_rain_effects_long" v="啟用/禁用降雨對土壤的影響（養分流失、pH 值變化）" eh="de3b14b9" />
     <e k="sf_plowing_bonus_short" v="翻耕獎勵" eh="541ec752" />
     <e k="sf_plowing_bonus_long" v="啟用/禁用翻耕對土壤肥力的好處（改善氮和有機質）" eh="fe701c1c" />
+    <e k="sf_yield_penalty_short" v="[EN] Yield Penalty" eh="00000000" />
+    <e k="sf_yield_penalty_long" v="[EN] Enable/disable real-time yield reduction based on N/P/K soil quality at harvest (up to -35% on depleted soil)" eh="00000000" />
     <e k="sf_weed_pressure_short" v="雜草壓力" eh="53f8b936" />
     <e k="sf_weed_pressure_long" v="啟用/禁用動態雜草生長及其對產量的影響" eh="ac99a865" />
     <e k="sf_pest_pressure_short" v="病蟲害壓力" eh="18a7c2be" />

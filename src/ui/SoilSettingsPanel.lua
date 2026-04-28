@@ -114,7 +114,7 @@ local CATEGORIES = {
             },
             {
                 header = "Environment",
-                items  = { "seasonalEffects", "rainEffects", "plowingBonus" }
+                items  = { "seasonalEffects", "rainEffects", "plowingBonus", "yieldPenalty" }
             },
             {
                 header = "Crop Stress",
@@ -183,6 +183,7 @@ local SETTING_DESCS = {
     seasonalEffects  = "Season-driven soil changes",
     rainEffects      = "Rain causes nutrient leaching",
     plowingBonus     = "Plow bonus for soil recovery",
+    yieldPenalty     = "Real-time yield cut at harvest (up to -35%)",
     weedPressure     = "Track and penalize weed spread",
     pestPressure     = "Track insect pest infestation",
     diseasePressure  = "Track fungal crop diseases",
@@ -226,6 +227,7 @@ local ADMIN_SECTIONS = {
             { label = "Seasonal Effects", desc = "Season-driven soil changes",                 stype = "setting", id = "seasonalEffects" },
             { label = "Rain Effects",     desc = "Rain causes nutrient leaching",              stype = "setting", id = "rainEffects" },
             { label = "Plowing Bonus",    desc = "Plow bonus for soil recovery",               stype = "setting", id = "plowingBonus" },
+            { label = "Yield Penalty",    desc = "Real-time yield cut based on N/P/K (max -35%)", stype = "setting", id = "yieldPenalty" },
             { label = "Soil Compaction",  desc = "Heavy vehicle compaction effects",            stype = "setting", id = "compactionEnabled" },
         },
     },

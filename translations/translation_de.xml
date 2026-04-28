@@ -12,6 +12,8 @@
     <e k="sf_rain_effects_long" v="Regenauswirkungen auf Boden ein-/ausschalten (Nährstoffauswaschung, pH-Änderungen)" eh="de3b14b9" />
     <e k="sf_plowing_bonus_short" v="Pflugbonus" eh="541ec752" />
     <e k="sf_plowing_bonus_long" v="Pflugvorteile für Bodenfruchtbarkeit ein-/ausschalten (verbesserter Stickstoff und organische Substanz)" eh="fe701c1c" />
+    <e k="sf_yield_penalty_short" v="[EN] Yield Penalty" eh="00000000" />
+    <e k="sf_yield_penalty_long" v="[EN] Enable/disable real-time yield reduction based on N/P/K soil quality at harvest (up to -35% on depleted soil)" eh="00000000" />
     <e k="sf_weed_pressure_short" v="Unkrautdruck" eh="7f71ee68" />
     <e k="sf_weed_pressure_long" v="Dynamisches Unkrautwachstum und Ertragseinfluss ein-/ausschalten" eh="27de5f41" />
     <e k="sf_pest_pressure_short" v="Schädlingsdruck" eh="eb771556" />

@@ -172,47 +172,75 @@ SoilConstants.RAIN = {
 }
 
 -- ========================================
--- CROP EXTRACTION RATES (per 1,000 liters harvested)
+-- CROP EXTRACTION RATES (per hectare harvested)
 -- ========================================
--- Calibrated for 0-100 nutrient scale (normalized by field area)
--- Typical 1-hectare field yields ~8,000L, resulting in 15-25% nutrient depletion
--- Example: 8,000L wheat depletes 16N, 6.4P, 12K (from defaults 50N, 40P, 45K)
+-- Values are NUTRIENT POINTS REMOVED PER HECTARE per harvest event on the 0-100 scale.
+-- This is area-based calibration, independent of yield volume.
+--
+-- The updateFieldNutrients() function converts the cutter's density-map area
+-- (spec.workAreaParameters.lastArea) to hectares via:
+--   MathUtil.areaToHa(area, g_currentMission:getFruitPixelsToSqm())
+-- then multiplies by these rates.  Forage crops that produce far more liters/ha
+-- than grain crops automatically get the same per-hectare treatment without any
+-- volume-specific fudge factors.
+--
+-- Calibration anchor: wheat removes ~120 kg N/ha → 16 N points (1 pt = 7.5 kg N)
+-- Source: standard agronomic nutrient-removal tables (IPNI / 4R reference)
 SoilConstants.CROP_EXTRACTION = {
-    wheat      = { N=2.00, P=0.80, K=1.50 },  -- Moderate N demand, standard grain
-    barley     = { N=1.80, P=0.80, K=1.40 },  -- Similar to wheat, slightly less
-    maize      = { N=2.30, P=1.00, K=2.00 },  -- High N/P demand, large biomass
-    canola     = { N=2.70, P=1.20, K=2.20 },  -- High N demand, oilseed
-    soybean    = { N=3.20, P=1.30, K=1.70 },  -- Highest N (compensates for fixation)
-    sunflower  = { N=2.50, P=1.10, K=2.30 },  -- Moderate-high demand
-    potato     = { N=3.80, P=1.70, K=5.40 },  -- Very high K demand (tuber crop)
-    sugarbeet  = { N=3.30, P=1.50, K=5.80 },  -- Extreme K demand (root crop)
-    oats       = { N=1.80, P=0.90, K=1.60 },  -- Light feeder
-    rye        = { N=2.00, P=0.80, K=1.80 },  -- Moderate demand
-    triticale  = { N=2.10, P=1.00, K=1.90 },  -- Hybrid characteristics
-    sorghum    = { N=2.30, P=0.90, K=1.80 },  -- Efficient nutrient user
-    peas       = { N=2.90, P=1.10, K=2.00 },  -- Legume, moderate demand
-    beans      = { N=3.00, P=1.20, K=2.10 },  -- Legume, similar to peas
+    -- ── Grain crops ──────────────────────────────────────────────────────────
+    wheat          = { N=16.0, P= 6.7, K=13.3 }, -- 120/50/100 kg/ha
+    barley         = { N=13.3, P= 6.0, K=12.0 }, -- 100/45/90 kg/ha
+    maize          = { N=20.0, P= 8.0, K=17.3 }, -- 150/60/130 kg/ha
+    canola         = { N=16.0, P= 7.3, K=14.7 }, -- 120/55/110 kg/ha (low FS25 yield but high removal)
+    soybean        = { N=25.3, P= 6.0, K=10.7 }, -- 190/45/80 kg/ha (seed is N-rich despite fixation)
+    sunflower      = { N=13.3, P= 7.3, K=17.3 }, -- 100/55/130 kg/ha
+    potato         = { N=26.7, P=10.0, K=46.7 }, -- 200/75/350 kg/ha (extreme K — tuber crop)
+    sugarbeet      = { N=24.0, P= 9.3, K=40.0 }, -- 180/70/300 kg/ha (extreme K — root crop)
+    oats           = { N=10.7, P= 4.0, K=10.7 }, -- 80/30/80 kg/ha (light feeder)
+    rye            = { N=12.0, P= 4.7, K=13.3 }, -- 90/35/100 kg/ha
+    triticale      = { N=14.7, P= 6.7, K=13.3 }, -- 110/50/100 kg/ha
+    sorghum        = { N=17.3, P= 6.7, K=14.7 }, -- 130/50/110 kg/ha
+    peas           = { N=21.3, P= 6.7, K=13.3 }, -- 160/50/100 kg/ha (legume but seeds are N-rich)
+    beans          = { N=22.7, P= 7.3, K=14.7 }, -- 170/55/110 kg/ha
 
-    -- ── Forage / biomass crops ─────────────────────────────────────────────────
-    -- Forage harvesters cut entire plants and produce very high liter volumes per
-    -- hectare (40,000–80,000 L/ha vs ~8,000 L/ha for grain).  Absolute nutrient
-    -- removal per hectare is similar to or less than grain, so the per-1000L rate
-    -- must be ~10-14× lower than the grain-calibrated defaults above.
-    --
-    -- Calibration target: ~8–14 N points depleted per full-hectare forage harvest,
-    -- comparable to a grain harvest (16 N pts).
-    miscanthus     = { N=0.15, P=0.04, K=0.18 }, -- Energy grass; low nutrient demand, very high volume
-    grass          = { N=0.20, P=0.07, K=0.22 }, -- Forage grass; multiple cuts/season
-    drygrass       = { N=0.18, P=0.06, K=0.20 }, -- Mowed/dried grass (same field, processed form)
-    alfalfa        = { N=0.08, P=0.12, K=0.30 }, -- Legume: fixes own N, moderate P/K removal
-    meadow         = { N=0.18, P=0.06, K=0.20 }, -- Mixed wildflower meadow; similar to grass
-    clover         = { N=0.07, P=0.10, K=0.25 }, -- Legume cover crop; near-zero N removal
-    oilseed_radish = { N=0.25, P=0.08, K=0.20 }, -- Cover crop; harvested at low volume
-    mint           = { N=0.28, P=0.09, K=0.22 }, -- Specialty herb; moderate nutrient removal
+    -- ── Forage / biomass crops ───────────────────────────────────────────────
+    -- Rates represent PER-HARVEST-EVENT nutrient removal; grass/alfalfa may be
+    -- cut multiple times per season, so annual totals can exceed grain crops.
+    -- Values are inherently correct here regardless of liters/ha yield because
+    -- the calculation is area-driven, not volume-driven.
+    miscanthus     = { N= 9.3, P= 2.7, K=10.7 }, -- 70/20/80 kg/ha; low-input energy crop
+    grass          = { N=13.3, P= 3.3, K=13.3 }, -- 100/25/100 kg/ha per cut (multi-cut crop)
+    drygrass       = { N=12.0, P= 2.9, K=12.0 }, -- Dried/mowed grass; similar to fresh
+    alfalfa        = { N= 3.3, P= 4.0, K=13.3 }, -- 25/30/100 kg/ha; N-fixing legume
+    meadow         = { N=10.7, P= 2.7, K=10.7 }, -- 80/20/80 kg/ha; mixed meadow
+    clover         = { N= 2.7, P= 3.3, K=12.0 }, -- 20/25/90 kg/ha; N-fixing cover crop
+    oilseed_radish = { N= 8.0, P= 2.0, K= 6.7 }, -- 60/15/50 kg/ha; low-volume cover crop
+    mint           = { N=10.7, P= 2.7, K= 9.3 }, -- 80/20/70 kg/ha; specialty herb
 }
 
--- Default extraction for unknown crops (average cereal)
-SoilConstants.CROP_EXTRACTION_DEFAULT = { N=2.10, P=0.90, K=1.70 }
+-- Default extraction for unknown crops (average cereal, per ha)
+SoilConstants.CROP_EXTRACTION_DEFAULT = { N=15.0, P=6.0, K=13.0 }
+
+-- ========================================
+-- YIELD PENALTY (soil quality → combine output)
+-- ========================================
+-- When soil nutrients are below optimal, a yield penalty is applied to the
+-- combine/forage harvester's fill level in real-time via addFillUnitFillLevel.
+-- The penalty is proportional to how far below optimal each nutrient is,
+-- weighted by agronomic importance.  Maximum 35% yield reduction at zero nutrients.
+SoilConstants.YIELD_PENALTY = {
+    -- Threshold above which each nutrient gives full quality score (0-100 scale)
+    N_OPTIMAL   = 60,   -- Adequate nitrogen: ≥60 = 100% N quality
+    P_OPTIMAL   = 40,   -- Adequate phosphorus: ≥40 = 100% P quality
+    K_OPTIMAL   = 40,   -- Adequate potassium: ≥40 = 100% K quality
+    -- Weighting: N is primary yield driver, P/K contribute ~20% each
+    N_WEIGHT    = 0.60,
+    P_WEIGHT    = 0.20,
+    K_WEIGHT    = 0.20,
+    -- Maximum yield penalty fraction (0 = no effect, 0.35 = up to 35% reduction)
+    -- At completely depleted soil (N=P=K=0): yield × (1 - 0.35) = 65% of potential
+    MAX_PENALTY = 0.35,
+}
 
 -- ========================================
 -- FERTILIZER PROFILES (per 1,000 liters applied)

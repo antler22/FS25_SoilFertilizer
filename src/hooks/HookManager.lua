@@ -868,8 +868,48 @@ function HookManager:installHarvestHook()
                 local fieldId = hookMgrRef:getFieldIdAtWorldPosition(x, z)
                 if not fieldId or fieldId <= 0 then return end
 
-                SoilLogger.debug("[HarvestHook] Field %d, Crop %d, %.0fL, area=%.1fm2, strawRatio=%.2f",
+                SoilLogger.debug("[HarvestHook] Field %d, Crop %d, %.0fL, area=%.1f px, strawRatio=%.2f",
                     fieldId, fruitType, totalLiters, area, strawRatio)
+
+                -- ── Yield penalty: deduct penalty liters from combine/forage tank ──────
+                -- Soil N/P/K below optimal directly reduces the harvested amount in
+                -- real-time.  The penalty is removed from the combine BEFORE onHarvest
+                -- records the nutrient depletion, so the depletion is also proportionally
+                -- reduced (the combine harvested less → less was extracted from the soil).
+                if totalLiters > 0 and g_SoilFertilityManager.soilSystem.getYieldMultiplier then
+                    local yieldMult = g_SoilFertilityManager.soilSystem:getYieldMultiplier(fieldId)
+                    if yieldMult < 1.0 then
+                        local penaltyLiters = totalLiters * (1.0 - yieldMult)
+                        local combineVehicle = spec.workAreaParameters.combineVehicle
+                        if combineVehicle and combineVehicle.spec_combine then
+                            local sc = combineVehicle.spec_combine
+                            -- Prefer buffer fill unit (forage harvesters) so the deduction
+                            -- happens before the buffer drains to the main tank.
+                            local fillUnitIdx = sc.bufferFillUnitIndex or sc.fillUnitIndex
+                            if fillUnitIdx then
+                                local ok, err = pcall(function()
+                                    combineVehicle:addFillUnitFillLevel(
+                                        combineVehicle:getOwnerFarmId(),
+                                        fillUnitIdx,
+                                        -penaltyLiters,
+                                        fruitType,
+                                        ToolType.UNDEFINED,
+                                        nil
+                                    )
+                                end)
+                                if not ok then
+                                    SoilLogger.warning("[YieldPenalty] addFillUnitFillLevel failed: %s", tostring(err))
+                                else
+                                    SoilLogger.info("[YieldPenalty] Field %d: mult=%.3f, -%.1fL of %.1fL",
+                                        fieldId, yieldMult, penaltyLiters, totalLiters)
+                                    -- Adjust totalLiters so nutrient depletion matches actual harvest
+                                    totalLiters = totalLiters * yieldMult
+                                end
+                            end
+                        end
+                    end
+                end
+
                 g_SoilFertilityManager.soilSystem:onHarvest(fieldId, fruitType, totalLiters, strawRatio, area)
             end)
 

@@ -35,6 +35,7 @@ function SoilSettingsGUI:registerConsoleCommands()
     addConsoleCommand("SoilSetSeasonalEffects", "Enable/disable seasonal effects (true/false)", "consoleCommandSetSeasonalEffects", self)
     addConsoleCommand("SoilSetRainEffects", "Enable/disable rain effects (true/false)", "consoleCommandSetRainEffects", self)
     addConsoleCommand("SoilSetPlowingBonus", "Enable/disable plowing bonus (true/false)", "consoleCommandSetPlowingBonus", self)
+    addConsoleCommand("SoilSetYieldPenalty", "Enable/disable real-time yield penalty (true/false)", "consoleCommandSetYieldPenalty", self)
     addConsoleCommand("SoilShowSettings", "Show current settings", "consoleCommandShowSettings", self)
     addConsoleCommand("SoilFieldInfo", "Show field soil information (fieldId)", "consoleCommandFieldInfo", self)
     addConsoleCommand("SoilFieldForecast", "Show yield forecast for field", "consoleCommandFieldForecast", self)
@@ -60,6 +61,7 @@ function SoilSettingsGUI:consoleCommandHelp()
     print("SoilSetSeasonalEffects true|false - Toggle seasonal effects")
     print("SoilSetRainEffects true|false - Toggle rain effects")
     print("SoilSetPlowingBonus true|false - Toggle plowing bonus")
+    print("SoilSetYieldPenalty true|false - Toggle real-time yield penalty")
     print("SoilShowSettings - Show current settings")
     print("SoilFieldInfo <fieldId> - Show soil info for field")
     print("SoilFieldForecast <fieldId> - Show yield forecast for field")
@@ -189,6 +191,18 @@ function SoilSettingsGUI:consoleCommandSetPlowingBonus(enabled)
     return "Error: Soil Mod not initialized"
 end
 
+function SoilSettingsGUI:consoleCommandSetYieldPenalty(enabled)
+    if enabled == nil then return "Usage: SoilSetYieldPenalty true|false" end
+    local enable = enabled:lower()
+    if enable ~= "true" and enable ~= "false" then return "Invalid value. Use 'true' or 'false'" end
+    if g_SoilFertilityManager and g_SoilFertilityManager.settings then
+        local newVal = (enable == "true")
+        requestSettingChange("yieldPenalty", newVal)
+        return string.format("Yield penalty %s", newVal and "enabled" or "disabled")
+    end
+    return "Error: Soil Mod not initialized"
+end
+
 function SoilSettingsGUI:consoleCommandDebug()
     if g_SoilFertilityManager and g_SoilFertilityManager.settings then
         local newVal = not g_SoilFertilityManager.settings.debugMode
@@ -212,12 +226,13 @@ function SoilSettingsGUI:consoleCommandShowSettings()
         local info = string.format(
             "=== Soil & Fertilizer Mod Settings ===\n" ..
             "Enabled: %s\nDebug Mode: %s\nFertility System: %s\nNutrient Cycles: %s\nFertilizer Costs: %s\nDifficulty: %s\nNotifications: %s\n" ..
-            "Seasonal Effects: %s\nRain Effects: %s\nPlowing Bonus: %s\nFields Tracked: %d\n" ..
+            "Seasonal Effects: %s\nRain Effects: %s\nPlowing Bonus: %s\nYield Penalty: %s\nFields Tracked: %d\n" ..
             "================================",
             tostring(s.enabled), tostring(s.debugMode), tostring(s.fertilitySystem),
             tostring(s.nutrientCycles), tostring(s.fertilizerCosts),
             s:getDifficultyName(), tostring(s.showNotifications),
             tostring(s.seasonalEffects), tostring(s.rainEffects), tostring(s.plowingBonus),
+            tostring(s.yieldPenalty),
             g_SoilFertilityManager.soilSystem and g_SoilFertilityManager.soilSystem:getFieldCount() or 0
         )
         print(info)

@@ -12,6 +12,8 @@
     <e k="sf_rain_effects_long" v="Regenimpact op de bodem in-/uitschakelen (uitspoeling van voedingsstoffen, pH-veranderingen)" eh="de3b14b9" />
     <e k="sf_plowing_bonus_short" v="Ploegbonus" eh="541ec752" />
     <e k="sf_plowing_bonus_long" v="Ploegvoordelen voor bodemvruchtbaarheid in-/uitschakelen (verbeterde stikstof en organische stof)" eh="fe701c1c" />
+    <e k="sf_yield_penalty_short" v="[EN] Yield Penalty" eh="00000000" />
+    <e k="sf_yield_penalty_long" v="[EN] Enable/disable real-time yield reduction based on N/P/K soil quality at harvest (up to -35% on depleted soil)" eh="00000000" />
     <e k="sf_weed_pressure_short" v="Onkruiddruk" eh="7f71ee68" />
     <e k="sf_weed_pressure_long" v="Dynamische onkruidgroei en opbrengstimpact in-/uitschakelen" eh="27de5f41" />
     <e k="sf_pest_pressure_short" v="Plagen druk" eh="eb771556" />

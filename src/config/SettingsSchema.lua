@@ -105,6 +105,12 @@ SettingsSchema.definitions = {
         uiId = "sf_rain_effects",
     },
     {
+        id = "yieldPenalty",
+        type = "boolean",
+        default = true,
+        uiId = "sf_yield_penalty",
+    },
+    {
         id = "plowingBonus",
         type = "boolean",
         default = true,
