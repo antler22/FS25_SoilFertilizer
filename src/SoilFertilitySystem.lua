@@ -854,9 +854,12 @@ function SoilFertilitySystem:scanFields()
             local actualFieldId = field.farmland and field.farmland.id
 
             if actualFieldId and actualFieldId > 0 then
-                -- FS25: field.fieldArea is the cultivated area in hectares.
-                -- Fallback to farmland area if fieldArea is missing (though it shouldn't be).
-                local area = field.fieldArea or (field.farmland and field.farmland.area) or 1.0
+                -- FS25 Field objects expose area as field.areaHa (computed from polygon points).
+                -- Farmland fallback uses farmland.areaInHa (NOT farmland.area — wrong property).
+                -- field.fieldArea does NOT exist on FS25 Field objects and will always be nil.
+                local area = field.areaHa
+                    or (field.farmland and field.farmland.areaInHa)
+                    or 1.0
 
                 SoilLogger.debug("Found field %d (%.2f ha)", actualFieldId, area)
 
@@ -1573,8 +1576,25 @@ function SoilFertilitySystem:applyFertilizer(fieldId, fillTypeIndex, liters)
 
     local limits = SoilConstants.NUTRIENT_LIMITS
 
-    -- AREA NORMALIZATION: Calculate hectares for this field
+    -- AREA NORMALIZATION: Calculate hectares for this field.
+    -- If stored area is the 1.0 default (wrong — from old saves using field.fieldArea
+    -- which doesn't exist in FS25), lazy-resolve from g_fieldManager using the correct
+    -- field.areaHa / farmland.areaInHa properties and cache for subsequent calls.
     local areaInHa = field.fieldArea or 1.0
+    if areaInHa <= 1.01 and g_fieldManager and g_fieldManager.fields then
+        for _, fsField in ipairs(g_fieldManager.fields) do
+            if fsField and fsField.farmland and fsField.farmland.id == fieldId then
+                local resolved = fsField.areaHa
+                    or (fsField.farmland and fsField.farmland.areaInHa)
+                if resolved and resolved > 1.01 then
+                    field.fieldArea = resolved
+                    areaInHa = resolved
+                    SoilLogger.debug("Area lazy-resolved: field %d → %.2f ha (was 1.0 default)", fieldId, resolved)
+                end
+                break
+            end
+        end
+    end
     if areaInHa <= 0 then areaInHa = 1.0 end
 
     -- FERTILIZER RESTORATION CALCULATION:

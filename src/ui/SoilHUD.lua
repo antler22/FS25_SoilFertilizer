@@ -901,14 +901,24 @@ function SoilHUD:drawNutrientRow(label, nutrient, px, cy, pw, s, fontMult, info,
             local baseRate = (fillType and br[fillType.name]) or br.DEFAULT
             
             if baseRate then
-                local targetVolume = (info.fieldArea or 1.0) * baseRate.value
-                
+                -- Apply the user's current rate multiplier so the ghost bar responds
+                -- to rate slider changes in real-time (3 gal/ac vs 7 gal/ac should
+                -- show visibly different projected gains).
+                local rm = g_SoilFertilityManager and g_SoilFertilityManager.sprayerRateManager
+                local sprayerVehicle = self:getCurrentSprayer()
+                local rateMult = (rm and sprayerVehicle and sprayerVehicle.id)
+                    and rm:getMultiplier(sprayerVehicle.id) or 1.0
+                local effectiveRate = baseRate.value * rateMult
+
+                local fieldAreaHa   = info.fieldArea or 1.0
+                local targetVolume  = fieldAreaHa * effectiveRate
+
                 -- Ghost bar shows the gain remaining to reach the 90% threshold
                 local threshold = targetVolume * (SoilConstants.SPRAYER_RATE.FERTILIZER_COVERAGE_THRESHOLD or 0.90)
                 local remaining = math.max(0, threshold - currentBuffer)
-                
+
                 if remaining > 0 then
-                    projectedDelta = profile[label] * (remaining / 1000) / (info.fieldArea or 1.0)
+                    projectedDelta = profile[label] * (remaining / 1000) / fieldAreaHa
                     local ghostFill = math.min(1.0 - fill, projectedDelta / 100)
                     if ghostFill > 0 then
                         self:drawRect(barX + barW * fill, barY, barW * ghostFill, barH, col, 0.35)
